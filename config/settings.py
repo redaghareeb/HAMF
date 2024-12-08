@@ -39,3 +39,7 @@ MINIO = {
     'secret_key': 'password',
     'bucket': 'hamf-data'
 }
+LOGGING = {
+    'log_dir': './logs/',
+    'log_level': 'DEBUG'
+}
