@@ -123,3 +123,21 @@ docker logs hamf-custom-env
 ```sh
 docker ps
 ```
+***
+## Step 4: Automate Deployments with GitLab CI/CD
+1. **Commit and Push Changes:**
+- Any code updates in the repository will trigger the GitLab pipeline.
+2. **Monitor CI/CD Pipelines:**
+- Access the CI/CD dashboard in GitLab for pipeline execution and logs.
+***
+## Step 5: Extend with Additional Tools
+1. **Slack Notifications:**
+- Integrate Slack alerts in the GitLab pipeline by adding webhook configurations in .gitlab-ci.yml.
+2. **Documentation with BookStack:**
+- Include BookStack for documentation hosting in docker-compose.yml.
+3. **Scaling and Optimization:**
+- Scale the HAMF environment for larger workloads:
+```sh
+deploy:
+  replicas: 3
+```
