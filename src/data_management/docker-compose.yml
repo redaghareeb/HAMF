@@ -1,6 +1,40 @@
 version: '3.9'
 
 services:
+  selenium-container:
+    image: selenium/standalone-chrome
+    container_name: selenium
+    ports:
+      - "4444:4444"
+    volumes:
+      - ./data:/app/data  # Shared volume for data
+
+  custom-python-collector:
+    build:
+      context: ./custom-collector
+      dockerfile: Dockerfile
+    container_name: python-collector
+    volumes:
+      - ./data:/app/data
+    environment:
+      - API_KEYS=your_api_keys
+
+  spark-container:
+    image: bitnami/spark
+    container_name: spark
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+
+  pandas-cleaner:
+    build:
+      context: ./pandas-cleaner
+      dockerfile: Dockerfile
+    container_name: pandas-cleaner
+    volumes:
+      - ./data:/app/data
+      
   postgres:
     image: postgres:13
     environment:
