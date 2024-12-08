@@ -24,3 +24,18 @@ MONITORING = {
     "enable_grafana": True,
     "alert_thresholds": {"accuracy": 0.95}
 }
+
+DATABASE = {
+    'host': 'localhost',
+    'port': 5432,
+    'user': 'admin',
+    'password': 'password',
+    'dbname': 'hamf_db'
+}
+
+MINIO = {
+    'endpoint': 'http://localhost:9000',
+    'access_key': 'admin',
+    'secret_key': 'password',
+    'bucket': 'hamf-data'
+}
