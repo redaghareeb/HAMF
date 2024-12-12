@@ -26,6 +26,9 @@ Before starting the installation, ensure the following are installed on your sys
 2. **Directory Overview**
    ```
    HAMF/
+   ├── ci/
+   ├── config/
+   │   ├── settings.py
    ├── docker/
    │   ├── docker-compose.yml
    │   ├── services/
@@ -39,10 +42,8 @@ Before starting the installation, ensure the following are installed on your sys
    │   ├── shared/
    │       ├── config/
    │       ├── volumes/
-   ├── config/
-   │   ├── settings.py
    ├── docs/
-   ├── tests/
+   ├── examples/
    └── LICENSE
    ```
 
