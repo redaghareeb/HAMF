@@ -44,6 +44,7 @@ Before starting the installation, ensure the following are installed on your sys
    │       ├── volumes/
    ├── docs/
    ├── examples/
+   ├── tests/
    └── LICENSE
    ```
 
