@@ -113,12 +113,68 @@ Before starting the installation, ensure the following are installed on your sys
    ```
 
 3. **Access Services**
-   - **MinIO Console:** `http://localhost:9001` (Default Credentials: `minioadmin/minioadmin`)
-   - **Grafana Dashboard:** `http://localhost:3000`
-   - **BookStack Documentation:** `http://localhost:6875`
-   - **Prometheus:** `http://localhost:9090`
+   After starting the containers, you can access the following services:
 
----
+   ### **Infrastructure Services**
+   - **PostgreSQL** (No Web Interface)
+     - Host: `localhost:5432`
+     - Username: `postgres`
+     - Password: `postgres`
+     - Database: `hamf_db`
+
+   - **MinIO Object Storage**
+     - URL: [http://localhost:9000](http://localhost:9000)
+     - Console: [http://localhost:9001](http://localhost:9001)
+     - Username: `minioadmin`
+     - Password: `minioadmin`
+
+   ### **Machine Learning & Storage**
+   - **MLFlow**
+     - URL: [http://localhost:5000](http://localhost:5000)
+     - No authentication required by default.
+
+   - **Apache Spark**
+     - URL: [http://localhost:8080](http://localhost:8080)
+     - Username/Password: Not Applicable
+
+   ### **Monitoring & Visualization**
+   - **Grafana**
+     - URL: [http://localhost:3000](http://localhost:3000)
+     - Username: `admin`
+     - Password: `admin` (Default credentials; change after first login.)
+
+   - **Prometheus**
+     - URL: [http://localhost:9090](http://localhost:9090)
+     - Username/Password: Not Applicable
+
+   - **Elasticsearch**
+     - URL: [http://localhost:9200](http://localhost:9200)
+     - Username: `elastic`
+     - Password: `changeme` (Default credentials; change in production.)
+
+   ### **Documentation Services**
+   - **BookStack**
+     - URL: [http://localhost:6875](http://localhost:6875)
+     - Username: `admin@bookstack`
+     - Password: `password` (Default credentials; change after first login.)
+
+   ### **Custom and Application Logic**
+   - **Selenium (Scraping Tool)**
+     - URL: [http://localhost:4444](http://localhost:4444)
+     - Username/Password: Not Applicable
+
+   - **Slack**
+     - No direct URL interface. Uses the API token defined in `SLACK_CONFIG`.
+
+   - **SMTP**
+     - No direct URL interface. Uses the SMTP settings defined in `SMTP_CONFIG`.
+
+   ### **Backup Services**
+   - **Amanda Backup**
+     - URL: [http://localhost:10080](http://localhost:10080)
+     - Username/Password: Not Applicable
+
+   ---
 
 ## **Customizing Docker Compose**
 
