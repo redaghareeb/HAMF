@@ -32,12 +32,24 @@ Before starting the installation, ensure the following are installed on your sys
    ├── docker/
    │   ├── docker-compose.yml
    │   ├── services/
-   │   │   ├── data-collection/
-   │   │   ├── preprocessing/
-   │   │   ├── model-training/
-   │   │   ├── monitoring/
-   │   │   ├── slack/
-   │   │   ├── smtp/
+   │   │   ├── data_management/
+   │   │   │   ├── data_collection/
+   │   │   │   │   ├── custom_collector/
+   │   │   │   │   ├── selenium_scapper/
+   │   │   │   │   ├── data_cleaner/
+   │   │   │   ├── data_preprocessing/
+   │   │   │   │   ├── spark/
+   │   │   │   │   ├── preprocess_data.py
+   │   │   │   ├── database/
+   │   │   │   │   ├── db_operations.py
+   │   │   │   │   ├── init.sql
+   │   │   │   ├── logstash/
+   │   │   │   │   ├── logstash.conf
+   │   │   ├── model_(re)training/
+   │   │   ├── model_performance_monitoring/
+   │   │   ├── communication_and_notification/
+   │   │   │   ├── slack/
+   │   │   │   ├── smtp/
    │   │   ├── governance_and_privacy/
    │   ├── shared/
    │       ├── config/
