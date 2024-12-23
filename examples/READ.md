@@ -1,248 +1,228 @@
-# HAMF Workflow: Phishing Detection Model
+## Scenario Workflow
 
-This document outlines the workflow for logging, retraining, and monitoring a phishing detection model using the HAMF framework.
+This workflow outlines the steps to integrate a pre-trained model into the HAMF pipeline for real-time predictions and then monitor its performance to be retrained.
 
-## Step 1: Logging Features and Model
+**1. Leverage the Existing Trained Model**
 
-We'll populate the `features_master` and `models_master` tables with the provided features and model details.
+*   **Objective:** Load the trained model (stored as a `.pkl` file) and integrate it into the HAMF pipeline for real-time predictions.
 
-### Logging Features into `features_master`
+*   **Steps:**
+    *   **Store the .pkl model artifact in MLflow:**
+        *   Log the trained model file (`.pkl`) as an artifact within an MLflow run. This allows for versioning, tracking, and retrieval of the model.
+    *   **Deploy the model as a REST API for predictions:**
+        *   Utilize MLflow's deployment capabilities to serve the model as a REST API endpoint. This enables other applications or services to send data and receive predictions in real-time.
 
-The provided features are:
+---
 
-*   "urllength"
-*   "numberofdots"
-*   "hostage"
-*   "hassecureconnection"
-*   "has_equal"
-*   "alexa_rank"
-*   "has_digits"
-*   "hostlength"
-*   "pathlength"
-*   "registrarname"
-*   "hyperlinks"
-*   "foreignlinks"
-*   "brokenhyperlinks"
-*   "trickyforms"
-*   "phishing"
-
-**Example Code:**
-
+**Loading the Existing Model**
 ```python
-features = [
-    "urllength", "numberofdots", "hostage", "hassecureconnection", "has_equal",
-    "alexa_rank", "has_digits", "hostlength", "pathlength", "registrarname",
-    "hyperlinks", "foreignlinks", "brokenhyperlinks", "trickyforms", "phishing"
-]
+import pickle
+import mlflow.pyfunc
 
-for feature in features:
-    feature_type = "numerical" if feature in ["urllength", "numberofdots", "alexa_rank", "hostlength", "pathlength"] else "categorical"
-    insert_feature(feature_name=feature, feature_type=feature_type)
-```
+# Load the pickle file
+with open("path_to_model.pkl", "rb") as file:
+    model = pickle.load(file)
 
-### Logging the Model into `models_master`
-We’ll log the model using the insert_model function.
-
-**Example Code:**
-
-```python
-insert_model(
-    model_name="PhishingDetectionModel",
-    algorithm="RandomForest",
-    model_version="v1.0"
+# Save the model in MLflow
+mlflow.pyfunc.log_model(
+    artifact_path="phishing_model",
+    python_model=model,
+    registered_model_name="PhishingModel"
 )
 
 ```
 
-### Mapping Features to the Model in `features_models_map`
-We’ll map the logged features to the model with their initial accuracy (dummy values for now).
+**2. Continuous Data Collection**
+*   **Objective:** Collect new data from multiple sources, extract features, and save them in PostgreSQL.
 
-**Example Code:**
+*   **Tools:** Selenium (for web scraping), Custom API integration, and PostgreSQL.
+---
+**Data Collection Pipeline**
+***Docker Services for Collectors:***
+1. **Custom Collector:** Collects raw data from APIs or other structured sources.
+2. **Selenium Scraper:** Scrapes websites to gather additional data.
 
+***Implementation Example:***
 ```python
-model_id = 1  # Assuming the model ID is 1 from `insert_model`
-feature_ids = range(1, 15)  # Assuming feature IDs are 1 to 14
+import requests
+import psycopg2
+from selenium import webdriver
+from psycopg2.extras import execute_values
 
-for feature_id in feature_ids:
-    insert_training_result(
-        model_id=model_id,
-        accuracy=99.83,  # Placeholder accuracy
-        feature_id=feature_id,
-        last_used=datetime.now()
-    )
-```
-
-### Log Training Results
-
-Add the 99.83% accuracy and additional performance metrics for Gradient Boosting to the training_results table.
-
-**Example Code:**
-```python
-insert_training_result(
-    model_id=2,  # Assuming the new model ID is 2
-    accuracy=99.83,
-    f1_score=0.998,  # Example F1 score
-    precision=0.999,  # Example precision
-    recall=0.997,  # Example recall
-    training_status="completed"
+# Connect to PostgreSQL
+conn = psycopg2.connect(
+    host="localhost", dbname="hamf_db", user="postgres", password="postgres"
 )
+
+# Data Collector Function
+def collect_data():
+    # Example API data collection
+    response = requests.get("https://api.example.com/data")
+    raw_data = response.json()
+
+    # Store raw data in PostgreSQL
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            "INSERT INTO raw_data (source, collected_date, data) VALUES %s",
+            [(source, collected_date, raw_data)],
+        )
+        conn.commit()
+
+# Selenium Scraper Example
+def scrape_website():
+    driver = webdriver.Chrome()
+    driver.get("https://example.com")
+    scraped_data = driver.page_source
+    # Process and store data in PostgreSQL
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO raw_data (source, collected_date, data) VALUES (%s, %s, %s)", ("website", "2024-01-01", scraped_data))
+        conn.commit()
+    driver.quit()
+
+collect_data()
+scrape_website()
+
 ```
+---
 
+## 3. Feature Extraction
 
-## Step 2: Retraining the Model ##
-**Data Preprocessing**
-The features "alexa_rank" and "pathlength" might require scaling, while categorical features like "hassecureconnection" and "trickyforms" might need encoding. We’ll preprocess the data using Spark.
+### Objective
+Process collected data to extract all features listed in PostgreSQL and generate a monthly CSV file for analysis.
 
-Example `preprocess_data.py`:
-
-```python
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when
-
-# Initialize Spark session
-spark = SparkSession.builder.appName("Preprocessing").getOrCreate()
-
-# Load raw data
-raw_data = spark.read.csv("/app/raw_data.csv", header=True, inferSchema=True)
-
-# Feature engineering
-processed_data = raw_data \
-    .withColumn("alexa_rank_scaled", col("alexa_rank") / 1000000) \
-    .withColumn("pathlength_normalized", col("pathlength") / col("urllength")) \
-    .withColumn("hassecureconnection_encoded", when(col("hassecureconnection") == "yes", 1).otherwise(0)) \
-    .drop("alexa_rank", "pathlength", "hassecureconnection")
-
-# Save processed data
-processed_data.write.csv("/app/processed_data.csv", header=True)
-
-```
-
-**Model Retraining**
-Retrain the Random Forest model on the updated dataset and evaluate its performance.
-
-**Track ReTraining Runs with MLflow**
-
-Example `train.py`:
-
-```python
-import pandas as pd
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
-import mlflow
-import mlflow.sklearn
-
-# Load processed data
-data = pd.read_csv("/app/processed_data.csv")
-X = data.drop("phishing", axis=1)  # Assuming 'phishing' is the target variable
-y = data["phishing"]
-
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Start MLflow experiment
-mlflow.set_experiment("Phishing Detection Experiment")
-
-with mlflow.start_run():
-    # Train Gradient Boosting model
-    model = GradientBoostingClassifier(n_estimators=1000, random_state=42)
-    model.fit(X_train, y_train)
-
-    # Evaluate model
-    y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
-
-    # Log parameters
-    mlflow.log_param("n_estimators", 1000)
-    mlflow.log_param("random_state", 42)
-
-    # Log metrics
-    mlflow.log_metric("accuracy", accuracy * 100)
-    mlflow.log_metric("f1_score", f1)
-    mlflow.log_metric("precision", precision)
-    mlflow.log_metric("recall", recall)
-
-    # Log model
-    mlflow.sklearn.log_model(model, "model")
-
-    print(f"Model logged with accuracy: {accuracy * 100:.2f}%")
-```
-
-## Step 3: Monitoring Model Performance
-Utilize MLflow to track and visualize metrics from training and retraining runs.
-
-**1. Access MLflow UI:**
-
-*   View metrics logged during model training and retraining through the MLflow UI.
-*   Access the UI at: `http://localhost:5000`
-
-**2. Integrate MLflow with Prometheus:**
-
-Prometheus can be configured to query and monitor MLflow metrics by using an exporter.
-
-**Steps:**
-
-*   **Export Metrics:**
-    *   Employ a custom script or a dedicated tool to extract metrics from MLflow.
-    *   Push the extracted metrics to Prometheus.
-*   **Prometheus Exporter:**
-    * Use an MLflow to Prometheus exporter. This tool acts as a bridge, periodically fetching metrics from MLflow and exposing them in a format that Prometheus can understand.
-    * **Prometheus Exporter Script:**
+### Implementation
+1. **Read feature definitions** from the `features_master` table.
+2. **Apply transformations** and generate datasets.
+3. **Feature Extraction Script:**
     ```python
-    import requests
-    from prometheus_client import Gauge, start_http_server
+    import pandas as pd
+    import psycopg2
 
-    # Prometheus metrics
-    accuracy_gauge = Gauge("mlflow_model_accuracy", "Accuracy of the latest MLflow model")
-    f1_gauge = Gauge("mlflow_model_f1_score", "F1 score of the latest MLflow model")
+    # Connect to PostgreSQL
+    conn = psycopg2.connect(
+        host="localhost", dbname="hamf_db", user="postgres", password="postgres"
+    )
 
-    def fetch_latest_metrics():
-        # Fetch metrics from MLflow API
-        response = requests.get("http://localhost:5000/api/2.0/mlflow/runs/search?experiment_ids=1")
-        data = response.json()
-        latest_run = data["runs"][0]  # Assuming the first run is the latest
+    def extract_features():
+        # Read features from PostgreSQL
+        query = "SELECT feature_name FROM features_master WHERE feature_status='active'"
+        features = []
+        with conn.cursor() as cur:
+            cur.execute(query)
+            features = [row[0] for row in cur.fetchall()]
 
-        # Extract metrics
-        metrics = latest_run["data"]["metrics"]
-        return metrics
+        # Example transformation
+        data = pd.read_sql("SELECT * FROM raw_data", conn)
+        transformed_data = data[features]  # Extract relevant features
+        transformed_data.to_csv("/app/monthly_dataset.csv", index=False)
 
-    def update_prometheus_metrics(metrics):
-        accuracy_gauge.set(metrics["accuracy"])
-        f1_gauge.set(metrics["f1_score"])
-
-    if __name__ == "__main__":
-        start_http_server(8000)  # Start Prometheus metrics endpoint
-        metrics = fetch_latest_metrics()
-        update_prometheus_metrics(metrics)
+    extract_features()
 
     ```
 
-## Step 4: Visualizing Metrics in Grafana
-Leverage Grafana to visualize the metrics collected by Prometheus, including those exported from MLflow.
+### Notes
+- The extracted features are stored in the PostgreSQL database under the `extracted_features` table.
+- Monitoring is conducted using Grafana to ensure performance and feature relevance.
+- Feature retirement is tracked, and if invalid features are detected, the system triggers alerts and adjusts the feature set accordingly&#8203;:contentReference[oaicite:0]{index=0}.
+---
 
-**1. Add Prometheus as a Data Source:**
+## 4. Performance Evaluation
 
-*   Within Grafana, configure Prometheus as a data source. This allows Grafana to query the metrics stored in Prometheus.
+### Objective
+Evaluate the model’s performance on new datasets monthly.
 
-**2. Create Visualization Panels:**
+### Implementation
+1. **Load Monthly Dataset**  
+   - Retrieve the latest monthly dataset from PostgreSQL or CSV storage.  
+   - Ensure the dataset is preprocessed and aligned with feature expectations.
 
-*   Construct panels within Grafana to display the following metrics:
-    *   **Accuracy:** `mlflow_model_accuracy` (or your metric's name in prometheus if different.)
-    *   **F1 Score:** `mlflow_model_f1_score` (or your metric's name in prometheus if different)
-    *   **Precision and Recall:**  (If these metrics are logged and exported to Prometheus, create panels for them using their respective metric names.)
+2. **Run Predictions**  
+   - Apply the phishing detection model to the new dataset.  
+   - Use the model to generate predictions and output results.  
 
-**3. Set Alerts for Performance Degradation:**
+3. **Calculate Performance Metrics**  
+   - Calculate key evaluation metrics, including:  
+     - **Accuracy**  
+     - **Precision**  
+     - **Recall**  
+     - **F1-Score**  
+     - **AUC-ROC** 
+**Evaluation Script:**
+```python
+import pandas as pd
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
-*   Establish alerts within Grafana to proactively identify potential issues. Examples include:
-    *   **Accuracy Alert:**
-        *   **Trigger:** `mlflow_model_accuracy` (or equivalent metric name) drops below 98%.
-        *   **Notification Method:** Set up the notification channel (e.g., email, Slack)
-    *   **F1 Score Alert:**
-        *   **Trigger:** `mlflow_model_f1_score` (or equivalent metric name) drops below 0.95.
-        *   **Notification Method:** Set up the notification channel (e.g., email, Slack)
+# Load new dataset and trained model
+data = pd.read_csv("/app/monthly_dataset.csv")
+X = data.drop("phishing", axis=1)
+y_true = data["phishing"]
 
+# Load model from MLflow
+model = mlflow.pyfunc.load_model("models:/PhishingModel/production")
 
+# Predict and evaluate
+y_pred = model.predict(X)
+accuracy = accuracy_score(y_true, y_pred)
+f1 = f1_score(y_true, y_pred)
+precision = precision_score(y_true, y_pred)
+recall = recall_score(y_true, y_pred)
+
+print(f"Accuracy: {accuracy}, F1: {f1}, Precision: {precision}, Recall: {recall}")
+
+```
+---
+
+## 5. Notify Owners of Degraded Performance
+### Objective: 
+Use Slack and SMTP to alert model owners if performance decreases.
+**Example Alert Logic:**
+```python
+import requests
+import smtplib
+
+# Thresholds
+ACCURACY_THRESHOLD = 0.98
+
+# Alert function
+def send_alert(accuracy):
+    if accuracy < ACCURACY_THRESHOLD:
+        # Send Slack notification
+        slack_webhook_url = "https://hooks.slack.com/services/your/webhook"
+        slack_message = {"text": f"Model performance degraded! Current accuracy: {accuracy:.2%}"}
+        requests.post(slack_webhook_url, json=slack_message)
+
+        # Send SMTP email notification
+        smtp_server = "smtp.example.com"
+        sender_email = "your_email@example.com"
+        receiver_email = "model_owner@example.com"
+        message = f"Subject: Model Performance Alert\n\nModel performance degraded! Current accuracy: {accuracy:.2%}"
+
+        with smtplib.SMTP(smtp_server, 587) as server:
+            server.starttls()
+            server.login("your_email@example.com", "your_password")
+            server.sendmail(sender_email, receiver_email, message)
+
+send_alert(accuracy)
+```
+
+## 6. Automate Retraining Suggestions
+If performance degrades:
+
+1. Suggest retraining.
+2. Generate and log feature importance rankings.
+3. Propose feature engineering.
+**Example Feature Importance Script:**
+```python
+import numpy as np
+
+# Feature importance
+feature_importances = model.feature_importances_
+important_features = sorted(zip(X.columns, feature_importances), key=lambda x: -x[1])
+
+print("Feature Importance Rankings:")
+for feature, importance in important_features:
+    print(f"{feature}: {importance:.4f}")
+
+```
 
