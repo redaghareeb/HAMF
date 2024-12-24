@@ -1,9 +1,9 @@
 import psycopg2
-from psycopg2.extras import Json
-from datetime import datetime
+from psycopg2.extras import execute_values
 import importlib.util
+from datetime import datetime
 
-# Load settings from config/settings.py
+# Load settings dynamically from config/settings.py
 def load_settings():
     spec = importlib.util.spec_from_file_location("settings", "./config/settings.py")
     settings = importlib.util.module_from_spec(spec)
@@ -11,24 +11,26 @@ def load_settings():
     return settings
 
 settings = load_settings()
-DATABASE_CONFIG = settings.DATABASE
+DATABASE = settings.DATABASE
 
-# Establish database connection
+
+# Establish database connection dynamically
 def connect_db():
     try:
         conn = psycopg2.connect(
-            host=DATABASE_CONFIG['host'],
-            port=DATABASE_CONFIG['port'],
-            user=DATABASE_CONFIG['user'],
-            password=DATABASE_CONFIG['password'],
-            dbname=DATABASE_CONFIG['dbname']
+            host=DATABASE['host'],
+            port=DATABASE['port'],
+            user=DATABASE['user'],
+            password=DATABASE['password'],
+            dbname=DATABASE['dbname']
         )
         return conn
     except Exception as e:
-        print(f"Error connecting to the database: {e}")
+        print(f"[ERROR] Database connection failed: {e}")
         return None
 
-# Insert a new feature
+
+# Insert new feature into features_master table
 def insert_feature(feature_name, feature_type, feature_status="active"):
     query = """
     INSERT INTO features_master (feature_name, feature_type, feature_status, last_updated)
@@ -40,9 +42,10 @@ def insert_feature(feature_name, feature_type, feature_status="active"):
             cur.execute(query, values)
             feature_id = cur.fetchone()[0]
             conn.commit()
-            print(f"Feature '{feature_name}' inserted with ID: {feature_id}")
+            print(f"[INFO] Feature '{feature_name}' inserted with ID: {feature_id}")
 
-# Insert a new model
+
+# Insert model into models_master table
 def insert_model(model_name, algorithm, model_version):
     query = """
     INSERT INTO models_master (model_name, algorithm, model_version, creation_date)
@@ -54,9 +57,10 @@ def insert_model(model_name, algorithm, model_version):
             cur.execute(query, values)
             model_id = cur.fetchone()[0]
             conn.commit()
-            print(f"Model '{model_name}' inserted with ID: {model_id}")
+            print(f"[INFO] Model '{model_name}' inserted with ID: {model_id}")
 
-# Insert training results
+
+# Insert training result into training_results table
 def insert_training_result(model_id, accuracy, f1_score, precision, recall, training_status="completed"):
     query = """
     INSERT INTO training_results (model_id, accuracy, f1_score, precision, recall, training_status, timestamp)
@@ -67,47 +71,47 @@ def insert_training_result(model_id, accuracy, f1_score, precision, recall, trai
         with conn.cursor() as cur:
             cur.execute(query, values)
             conn.commit()
-            print(f"Training result for model ID {model_id} logged.")
+            print(f"[INFO] Training result logged for model ID {model_id}.")
 
-# Insert data inventory
-def insert_data_inventory(data_name, data_category, access_roles, description):
-    query = """
-    INSERT INTO data_inventory (data_name, data_category, access_roles, description, last_accessed)
-    VALUES (%s, %s, %s, %s, %s);
-    """
-    values = (data_name, data_category, access_roles, description, datetime.now())
-    with connect_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query, values)
-            conn.commit()
-            print(f"Data inventory '{data_name}' inserted.")
 
-# Log audit data
+# Audit Logging for any table changes
 def log_audit(table_name, operation_type, old_data=None, new_data=None):
     query = """
     INSERT INTO audit_log (table_name, operation_type, old_data, new_data)
     VALUES (%s, %s, %s, %s);
     """
-    values = (table_name, operation_type, Json(old_data), Json(new_data))
+    values = (table_name, operation_type, old_data, new_data)
     with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(query, values)
             conn.commit()
-            print(f"Audit log created for {operation_type} on {table_name}.")
+            print(f"[INFO] Audit log created for {operation_type} on {table_name}.")
 
-# Example usage
-if __name__ == "__main__":
-    # Insert feature
-    insert_feature("age", "numerical")
-    
-    # Insert model
-    insert_model("CustomerSegmentationModel", "KMeans", "v1.0")
-    
-    # Insert training results
-    insert_training_result(1, 91.5, 0.89, 0.92, 0.88)
-    
-    # Insert data inventory
-    insert_data_inventory("Customer Data", "training", "data_scientist,admin", "Training dataset for segmentation.")
-    
-    # Log audit data
-    log_audit("features_master", "INSERT", None, {"feature_name": "age", "feature_type": "numerical"})
+
+# Bulk insert data (e.g., for raw_data)
+def bulk_insert_data(table_name, data_list):
+    query = f"""
+    INSERT INTO {table_name} (source, collected_date, data)
+    VALUES %s;
+    """
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            execute_values(cur, query, data_list)
+            conn.commit()
+            print(f"[INFO] Bulk data inserted into {table_name}.")
+
+
+# Fetch latest training result for monitoring
+def get_latest_training_result(model_id):
+    query = """
+    SELECT accuracy, f1_score FROM training_results
+    WHERE model_id = %s
+    ORDER BY timestamp DESC LIMIT 1;
+    """
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (model_id,))
+            result = cur.fetchone()
+            if result:
+                return {"accuracy": result[0], "f1_score": result[1]}
+            return None
